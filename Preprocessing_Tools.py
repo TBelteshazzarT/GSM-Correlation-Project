@@ -1,10 +1,3 @@
-"""
-Best attempt on copying the results of the paper,
-"Machine learning models for predicting geomagnetic
-storms across five solar cycles using Dst index and heliospheric varaibles"
-Daniel Boyd
-"""
-
 import pandas as pd
 from datetime import datetime, timedelta
 import os
@@ -13,97 +6,120 @@ import numpy as np
 import time
 from scipy.constants import mu_0, k
 
-def load_data(name='data.csv', years=(0,2025)):
-    """Loads the indicated dataset. If it can't be found it generates it new."""
+def load_data_as_pd(name):
     if os.path.exists(name):
-        # Load base dataset
-        print(f"The file '{name}' exists. Loading DataFrame...")
+        print(f"Loading dataset from {name}...")
         data = pd.read_csv(name, index_col=0, parse_dates=True)
-
-        # Ensure index is datetime
-        if not isinstance(data.index, pd.DatetimeIndex):
-            print("Converting index to DatetimeIndex...")
-            data.index = pd.to_datetime(data.index)
-
         return data
     else:
-        # Generate the data set used in the paper
-        print(f"The file '{name}' does not exist. Generating DataFrame and saving csv...")
-        start_time = time.time()
-        data = create_dataset(name=name, years=years)
-        # Ensure index is datetime
-        if not isinstance(data.index, pd.DatetimeIndex):
-            print("Converting index to DatetimeIndex...")
-            data.index = pd.to_datetime(data.index)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f'Dataset took {elapsed_time} seconds to generate.')
-        return data
+        return None
 
-def create_dataset(name='data.csv', years=(0,2025)):
-    """Creates a data set from the Omni low-res data that is resampled to daily and then averaged over 30day intervals"""
-    # creates as csv of the DataFrame that is loaded into the variable 'data'
-    start, end = years
-    data = get(res='low', year_range=(start, end), flag_replace=True,  file_name=name)
+def create_dataset(years, name, delay_time=24, forecast_horizon=6, feature_columns=None):
+    """
+    Creates a dataset from the Omni low-res data with a simulated data delay.
+    If a CSV file with the given name exists, it loads the data from the CSV.
+    Otherwise, it generates the dataset and saves it to the CSV.
 
-    # trim data to desired fields
-    #original dataset used
-    #filtered_data = data[['Year', 'Decimal Day', 'Hour', 'Field Magnitude Average |B|', 'Proton temperature',
-                          #'Proton Density', 'Plasma (Flow) speed', 'Na/Np', 'Flow Pressure', 'Kp', 'R',
-                          #'DST Index', 'f10.7_index', 'Bz GSE']]
-    filtered_data = data[['Year', 'Decimal Day', 'Hour', 'Field Magnitude Average |B|', 'Proton temperature',
-                          'Proton Density', 'Plasma (Flow) speed', 'Na/Np', 'Flow Pressure', 'Kp', 'R',
-                          'DST Index', 'f10.7_index', 'Bz GSE', 'sigma T', 'sigma N', 'sigma V', 'sigma-Na/Np',
-                          'ap-index']]
+    Parameters:
+    - years: Tuple of start and end years.
+    - name: Name of the file to save the dataset.
+    - delay_time: Number of hours to delay dataset.
+    - forecast_horizon: Number of future time steps to predict.
+    - feature_columns: List of column names to use as input features.
 
-    # convert dataset to datetime-index including hourly data
-    data_conv = convert_to_datetime_index(filtered_data)
+    Returns:
+    - X: Input data with shape (num_samples, num_features, sequence_length).
+    - y: Target data with shape (num_samples,).
+    - years_array: Array of years corresponding to each sample.
+    """
+    if feature_columns is None:
+        feature_columns = ['DST Index']  # Default to using only 'DST Index' if no features are specified
+    start_year, end_year = years
+    #years_array = np.array([start_year, end_year])
+    # Check if the CSV file already exists
+    if os.path.exists(name):
+        print(f"Loading dataset from {name}...")
+        data = pd.read_csv(name, index_col=0, parse_dates=True)
 
-    # split out dst index to find minimum
-    dst_data = data_conv[['DST Index']]
-    data_conv.drop(columns=['DST Index'], inplace=True)
+        X_df = data[feature_columns]
+        y_df = data['classification']
+        years_array = data.index.year.to_numpy()  # Extract years from the datetime index
 
-    #split out the kp index to find the maximum
-    kp_data = data_conv[['Kp']]
-    data_conv.drop(columns=['Kp'], inplace=True)
 
-    # find minimum dst values over 30-day intervals including hourly data
-    dst_min_data = find_min_over_30_day_intervals(dst_data)
+    else:
+        # If the CSV file does not exist, generate the dataset
+        print(f"Generating dataset and saving to {name}...")
+        data = get(res='low', year_range=(start_year, end_year), flag_replace=True, file_name=name)
+        print('Data pulled, processing...')
 
-    # find the maximum kp index over 30-day intervals
-    kp_max_data = find_min_over_30_day_intervals(kp_data, mode='max')
+        # initialize booleans for saving columns
+        beta = False
+        temperature_save = True
+        density_num_save = True
+        mag_save = True
 
-    # count DST Index values within specified ranges
-    ranges = [(-30, np.inf), (-50, -30), (-100, -50), (-200, -100), (-350, -200), (-np.inf, -350)]
-    range_names = ["Nominal", "Weak", "Moderate", "Strong", "Severe", "Extreme"]
-    dst_counts = storm_count(dst_data[['DST Index']], ranges, range_names)
+        # check if Beta is requested and what data should be added
+        if 'Beta' in feature_columns:
+            beta = True
+            feature_columns.remove('Beta')
+            if 'Proton temperature' not in feature_columns:
+                feature_columns.append('Proton temperature')
+                temperature_save = False
 
-    # resample the rest of the data on hour 0 and drop the 'Hour' column
-    resampled_data = data_conv[data_conv['Hour'].isin([0])]
-    resampled_data.drop(columns=['Hour'], inplace=True)
+            if 'Proton Density' not in feature_columns:
+                feature_columns.append('Proton Density')
+                density_num_save = False
 
-    #find the rms of the magnetic field magnitude and Bz
-    mag_data = resampled_data[['Field Magnitude Average |B|']]
-    bz_data = resampled_data[['Bz GSE']]
+            if 'Field Magnitude Average |B|' not in feature_columns:
+                feature_columns.append('Field Magnitude Average |B|')
+                mag_save = False
 
-    mag_rms = calculate_rms_for_30day_intervals(mag_data, 'Field Magnitude Average |B|')
-    bz_rms = calculate_rms_for_30day_intervals(bz_data, 'Bz GSE')
+        # Include specified columns for multivariate input
+        filtered_data = data[['Year', 'Decimal Day', 'Hour'] + feature_columns].copy()
+        data_conv = convert_to_datetime_index(filtered_data)
+        df_cleaned = data_conv.dropna()
+        df_cleaned['classification'] = df_cleaned['DST Index'].apply(classify_dst)
+        if beta:
+            # generate beta column
+            df_cleaned['Beta'] = df_cleaned.apply(calc_beta, axis=1)
+            feature_columns.append('Beta')
 
-    # find averages of the rest of the values over 30-day intervals
-    data_averaged = average_over_30_day_intervals(resampled_data)
+            # initialize columns as not included
+            feature_columns.remove('Proton temperature')
+            feature_columns.remove('Proton Density')
+            feature_columns.remove('Field Magnitude Average |B|')
+            if temperature_save:
+                feature_columns.append('Proton temperature')
+            if density_num_save:
+                feature_columns.append('Proton Density')
+            if mag_save:
+                feature_columns.append('Field Magnitude Average |B|')
 
-    # add min dst and dst counts back to the dataframe
-    data_merge = pd.concat([data_averaged, dst_min_data['DST Index'].rename("DST Index Min"), dst_counts,
-                            kp_max_data['Kp'].rename('Kp Index Max'), mag_rms, bz_rms]
-                           , axis=1)
+        # Use specified columns for X
+        X_df = df_cleaned[feature_columns] # filters out y
+        # Shift y data to account for delay and forecast
+        y_df = df_cleaned['classification'].shift(delay_time + forecast_horizon)
+        years_array = df_cleaned.index.year.to_numpy()  # Extract years from the datetime index
 
-    # create a total storm count
-    columns_to_count = ["Weak", "Moderate", "Strong", "Severe", "Extreme"]
-    data_merge['total storms'] = data_merge[columns_to_count].sum(axis=1)
 
-    # save data to csv and return
-    data_merge.to_csv(name, index=True)
-    return data_merge
+        # Combine X, y, and years into one dataframe
+        data_to_save = pd.concat([X_df, y_df], axis=1)
+
+        # Remove fill values from shifting
+        data_to_save.dropna(inplace=True)
+
+        # Save dataframe
+        data_to_save.to_csv(name, index=True)
+        X_df = data_to_save[feature_columns]
+        y_df = data_to_save['classification']
+
+    # Convert Dataframes to NumPy arrays
+    X = X_df.to_numpy()
+    y = y_df.to_numpy()
+
+    X.transpose()
+
+    return X, y, years_array
 
 def average_over_30_day_intervals(df):
     """

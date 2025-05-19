@@ -5,14 +5,14 @@ storms across five solar cycles using Dst index and heliospheric varaibles"
 Daniel Boyd
 """
 
-from Preprocessing_Tools import load_data
+from Preprocessing_Tools import create_dataset, load_data_as_pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
 
-
 import matplotlib.pyplot as plt
+
 
 def plot_time_series(data, columns):
     """
@@ -60,25 +60,25 @@ def plot_correlation_heatmap(data, columns):
         fmt='.2f',
         linewidths=0.5,
         mask=mask,  # Apply the mask to hide the upper triangle
-        vmin=-1,   # Set the minimum value for the color scale
-        vmax=1     # Set the maximum value for the color scale
+        vmin=-1,  # Set the minimum value for the color scale
+        vmax=1  # Set the maximum value for the color scale
     )
     plt.title('Correlation Heatmap (Lower Triangle)')
     plt.show()
 
+features = [    'Field Magnitude Average |B|',
+                'Bz GSE', 'Proton temperature', 'Proton Density', 'Plasma (Flow) speed', 'Na/Np',
+                'sigma T', 'sigma N', 'sigma V', 'sigma-Na/Np', 'Kp', 'R', 'DST Index', 'ap-index',
+                'f10.7_index']
+
 # Load the data
-data = load_data('processed_dat.csv', years=(1964, 2024))
+data = create_dataset(name='processed_dat.csv', years=(1964, 2024), delay_time=0, forecast_horizon=0, feature_columns=features)
+data = load_data_as_pd(name='processed_dat.csv')
 print(data.columns)
-# List of columns to plot
-columns_to_plot = ['total storms', 'Weak', 'Moderate', 'Strong', 'Severe', 'Extreme', 'Field Magnitude Average |B|', 'Bz GSE',
-                   'Plasma (Flow) speed', 'Proton Density', 'Proton temperature', 'Na/Np', 'R', 'DST Index Min']
 
 # Generate the time series plots
-plot_time_series(data, columns_to_plot)
+plot_time_series(data, features)
 
 # Generate Correlation plot
-corr_columns = ['Weak', 'Moderate', 'Strong', 'Severe', 'Extreme', 'total storms', 'Field Magnitude Average |B|',
-                'Bz GSE','Field Magnitude Average |B| RMS',
-                'Bz GSE RMS', 'Proton temperature', 'Proton Density', 'Plasma (Flow) speed', 'Na/Np',
-                'sigma T', 'sigma N', 'sigma V', 'sigma-Na/Np', 'Kp Index Max', 'R', 'DST Index Min', 'ap-index', 'f10.7_index']
-plot_correlation_heatmap(data, corr_columns)
+
+plot_correlation_heatmap(data, features)

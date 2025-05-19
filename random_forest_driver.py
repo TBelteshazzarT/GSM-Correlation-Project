@@ -75,11 +75,11 @@ model = model_load('RF.pkl')
 data = pd.read_csv('processed_dat.csv')
 df_cleaned = data.dropna()
 X_labels = ['Field Magnitude Average |B|', 'f10.7_index', 'Proton Density', 'Flow Pressure',
-            'Plasma (Flow) speed', 'Proton temperature', 'Na/Np', 'R', 'DST Index Min']
+            'Plasma (Flow) speed', 'Proton temperature', 'Na/Np', 'R']
 
 # Assign the data and target
 X = pd.DataFrame(df_cleaned, columns=X_labels)
-y = pd.Series(df_cleaned['total storms'])
+y = pd.Series(df_cleaned['DST Index'])
 
 # Split data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
