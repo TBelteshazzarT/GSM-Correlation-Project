@@ -66,19 +66,20 @@ def plot_correlation_heatmap(data, columns):
     plt.title('Correlation Heatmap (Lower Triangle)')
     plt.show()
 
-features = [    'Field Magnitude Average |B|',
+if __name__ == "__main__":
+    features = [    'Field Magnitude Average |B|',
                 'Bz GSE', 'Proton temperature', 'Proton Density', 'Plasma (Flow) speed', 'Na/Np',
                 'sigma T', 'sigma N', 'sigma V', 'sigma-Na/Np', 'Kp', 'R', 'DST Index', 'ap-index',
                 'f10.7_index']
 
-# Load the data
-data = create_dataset(name='processed_dat.csv', years=(1964, 2024), delay_time=0, forecast_horizon=0, feature_columns=features)
-data = load_data_as_pd(name='processed_dat.csv')
-print(data.columns)
+    # Load the data
+    data = create_dataset(name='processed_dat.csv', years=(1964, 2024), delay_time=0, forecast_horizon=0, feature_columns=features)
+    data = load_data_as_pd(name='processed_dat.csv')
+    print(data.columns)
 
-# Generate the time series plots
-plot_time_series(data, features)
+    # Generate the time series plots
+    plot_time_series(data, features)
 
-# Generate Correlation plot
+    # Generate Correlation plot
 
-plot_correlation_heatmap(data, features)
+    plot_correlation_heatmap(data, features)

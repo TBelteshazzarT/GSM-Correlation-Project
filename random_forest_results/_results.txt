@@ -1,0 +1,10 @@
+R-squared for test: 0.3843818712426146
+MSE for test: 150.59201469516697
+R-squared for train: 0.8243058077807844
+R-squared for train: 0.8243058077807844
+                       feature  importance
+4          Plasma (Flow) speed    0.250291
+0  Field Magnitude Average |B|    0.219922
+5           Proton temperature    0.139411
+6                        Na/Np    0.125193
+1                  f10.7_index    0.094357

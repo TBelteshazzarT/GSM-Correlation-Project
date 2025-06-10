@@ -105,13 +105,15 @@ def create_dataset(years, name, delay_time=24, forecast_horizon=6, feature_colum
         # Combine X, y, and years into one dataframe
         data_to_save = pd.concat([X_df, y_df], axis=1)
 
+        # Resample to hourly
+        data_resampled = data_to_save.resample('D').mean()
         # Remove fill values from shifting
-        data_to_save.dropna(inplace=True)
+        data_resampled.dropna(inplace=True)
 
         # Save dataframe
-        data_to_save.to_csv(name, index=True)
-        X_df = data_to_save[feature_columns]
-        y_df = data_to_save['classification']
+        data_resampled.to_csv(name, index=True)
+        X_df = data_resampled[feature_columns]
+        y_df = data_resampled['classification']
 
     # Convert Dataframes to NumPy arrays
     X = X_df.to_numpy()
