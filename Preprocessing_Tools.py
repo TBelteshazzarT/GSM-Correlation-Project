@@ -111,7 +111,7 @@ def create_dataset(years, name, delay_time=24, forecast_horizon=6, feature_colum
         data_resampled.dropna(inplace=True)
 
         # Save dataframe
-        data_resampled.to_csv(name, index=True)
+        data_resampled.to_csv(name, index=True, encoding='latin1')
         X_df = data_resampled[feature_columns]
         y_df = data_resampled['classification']
 

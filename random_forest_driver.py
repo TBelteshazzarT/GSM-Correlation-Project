@@ -1,20 +1,6 @@
 """
 Random Forest model
-using processed data set with y value being storm counts
-parameters from paper: 'ccp_alpha': 0.001,
-                       'criterion': 'poisson',
-                       'max_depth': 500,
-                       'max_features': 'log2',
-                       'min_samples_leaf': 1,
-                       'min_samples_split': 2,
-                       'n_estimators': 1600
-parameters from my hyperparameter training: 'ccp_alpha': 0.001,
- (on dataset with daily counts not hour)    'criterion': 'absolute_error',
-                                            'max_depth': 500,
-                                            'max_features': None,
-                                            'min_samples_leaf': 1,
-                                            'min_samples_split': 2,
-                                            'n_estimators': 1600
+using processed data set with y value being DST Index
 """
 import time
 
@@ -65,14 +51,14 @@ def gen_rf_model( x: pd.DataFrame, y: pd.DataFrame, hyperparam_tuning=False, par
     end_time = time.time()
     elapsed_time = end_time - start_time
     print(f'Model took {elapsed_time/60} min to generate.')
-    model_save(model_gen, name='random_forest_results\RF.pkl')
+    model_save(model_gen, name='random_forest_results/RF.pkl')
     return model_gen
 if __name__ == "__main__":
     # Load model if it exists
-    model = model_load('random_forest_results\RF.pkl')
+    model = model_load('random_forest_results/RF.pkl')
 
     # Load data set
-    data = pd.read_csv('processed_dat.csv')
+    data = pd.read_csv('processed_dat.csv', encoding='latin1')
     df_cleaned = data.dropna()
     X_labels = ['Field Magnitude Average |B|', 'f10.7_index', 'Proton Density', 'Flow Pressure',
             'Plasma (Flow) speed', 'Proton temperature', 'Na/Np', 'R']
@@ -133,7 +119,7 @@ if __name__ == "__main__":
     plt.title("RF Actual vs Predicted Values")
     ax.legend(['Testing', 'Training'])
     #plt.show()
-    plt.savefig('random_forest_results\RF_actual_v_pred.png')
+    plt.savefig('random_forest_results/RF_actual_v_pred.png')
 
     # Get feature importances
     importances = model.feature_importances_
@@ -156,12 +142,15 @@ if __name__ == "__main__":
     plt.xticks(rotation=90)
     plt.tight_layout()
     #plt.show()
-    plt.savefig('random_forest_results\RF_feature_importance.png')
+    plt.savefig('random_forest_results/RF_feature_importance.png')
 
-    file_path = "random_forest_results\_results.txt"  # Replace with your desired file name and path
+    file_path = "random_forest_results/_results.txt"  # Replace with your desired file name and path
 
     file = open(file_path, 'w')
     file.write(text)
     file.close()
 
-
+    #generate output dataset
+    predictions = model.predict(X)
+    df_cleaned['Predictions'] = predictions
+    df_cleaned.to_csv('random_forest_results/data_w_predictions.csv')
